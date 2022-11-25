@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+
+# Import the .env file
+if [ -f .env ]
+then
+  export $(cat .env | sed 's/#.*//g' | xargs)
+fi
+
+COMPOSE="docker-compose"
+
+# If we pass any arguments...
+if [ $# -gt 0 ];then
+
+    # start the app
+    if [ "$1" == "start" ]; then
+        $COMPOSE up -d
+
+    # stop the app
+    elif [ "$1" == "stop" ]; then
+        $COMPOSE down
+
+    # If "art" is used, pass-thru to "artisan"
+    # inside a new container
+    elif [ "$1" == "pa" ]; then
+        shift 1
+        $COMPOSE run --rm \
+            -w /var/www/html \
+            app \
+            php artisan "$@"
+
+    # If "composer" is used, pass-thru to "composer"
+    # inside a new container
+    elif [ "$1" == "composer" ]; then
+        shift 1
+        $COMPOSE run --rm \
+            -w /var/www/html \
+            app \
+            composer "$@"
+
+    # If "test" is used, run unit tests,
+    # pass-thru any extra arguments to php-unit
+    elif [ "$1" == "test" ]; then
+        shift 1
+        $COMPOSE run --rm \
+            -w /var/www/html \
+            app \
+            ./vendor/bin/phpunit "$@"
+
+    # If "npm" is used, run npm
+    # from our node container
+    elif [ "$1" == "npm" ]; then
+        shift 1
+        $COMPOSE run --rm \
+            -w /var/www/html \
+            node \
+            npm "$@"
+
+    # If "db" is used, run mariadb
+    # from our mariadb container
+    elif [ "$1" == "db-backup" ]; then
+        shift 1
+        docker exec wemail-mariadb mysqldump -u ${DB_USERNAME} -p${DB_PASSWORD} ${DB_DATABASE} > ./data/dumps/dump-$(date +"%d-%m-%Y_%s").sql
+
+    # Else, pass-thru args to docker-compose
+    else
+        $COMPOSE "$@"
+    fi
+
+else
+    $COMPOSE ps
+fi
